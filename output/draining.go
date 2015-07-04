@@ -54,7 +54,11 @@ func newDrainingOutput(bufferSize int, oSink drainingOutputSink, oClose draining
 			for !drained && !lines.Full() {
 				select {
 				case l = <-lineCh:
-					lines.Add(l)
+					if l == nil {
+						drained = true
+					} else {
+						lines.Add(l)
+					}
 
 				default:
 					drained = true
@@ -63,6 +67,10 @@ func newDrainingOutput(bufferSize int, oSink drainingOutputSink, oClose draining
 
 			// Begin sinking the lines.
 			sinkLines := lines.Drain()
+			if len(sinkLines) == 0 {
+				continue
+			}
+
 			sinkDone := make(chan struct{})
 
 			go func() {
@@ -74,6 +82,10 @@ func newDrainingOutput(bufferSize int, oSink drainingOutputSink, oClose draining
 			for !done {
 				select {
 				case l = <-lineCh:
+					if l == nil {
+						<-sinkDone
+						done = true
+					}
 					lines.Add(l)
 
 				case <-sinkDone:
