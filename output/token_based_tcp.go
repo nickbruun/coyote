@@ -1,9 +1,11 @@
 package output
 
 import (
+	"fmt"
 	"net"
 	"crypto/tls"
 	"time"
+	"os"
 )
 
 // New token based TCP output.
@@ -13,6 +15,7 @@ import (
 func NewTokenBasedTcpOutput(address, token string, timeout time.Duration, ssl bool) (Output, error) {
 	linePrefix := append([]byte(token), ' ')
 	var conn net.Conn = nil
+	failing := false
 
 	dialer := &net.Dialer{
 		Timeout: timeout,
@@ -23,15 +26,22 @@ func NewTokenBasedTcpOutput(address, token string, timeout time.Duration, ssl bo
 		var err error
 
 		if ssl {
-			if conn, err = tls.DialWithDialer(dialer, "tcp", address, nil); err != nil {
-				conn = nil
-				return err
-			}
+			conn, err = tls.DialWithDialer(dialer, "tcp", address, nil)
 		} else {
-			if conn, err = dialer.Dial("tcp", address); err != nil {
-				conn = nil
-				return err
+			conn, err = dialer.Dial("tcp", address)
+		}
+
+		if err != nil {
+			if !failing {
+				failing = true
+				fmt.Fprintf(os.Stderr, "Failed to connect to token-based TCP endpoint %s: %s\n", address, err)
 			}
+
+			conn = nil
+			return err
+		} else if failing {
+			fmt.Fprintf(os.Stderr, "Connected to token-based TCP endpoint %s\n", address)
+			failing = false
 		}
 
 		return nil
@@ -72,6 +82,8 @@ func NewTokenBasedTcpOutput(address, token string, timeout time.Duration, ssl bo
 				first = false
 
 				if n == 0 && err != nil {
+					fmt.Fprintf(os.Stderr, "Failed to send data to token-based TCP endpoint %s: %s - reconnecting...\n", address, err);
+
 					if err = dial(); err != nil {
 						return err
 					}
@@ -82,6 +94,9 @@ func NewTokenBasedTcpOutput(address, token string, timeout time.Duration, ssl bo
 			payload = payload[n:]
 
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to send data to token-based TCP endpoint %s: %s\n", address, err);
+
+				failing = true
 				conn.Close()
 				conn = nil
 				return err
