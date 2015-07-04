@@ -79,7 +79,7 @@ $(BUILD_REPOSITORY_PARENT_DIR):
 	mkdir -p $@
 
 $(BUILD_REPOSITORY_PATH): $(BUILD_REPOSITORY_PARENT_DIR)
-	ln -Fs $(subst $(SPACE),/,$(patsubst %,..,$(subst /, ,$(dir $(BUILD_REPOSITORY_PATH))))) $(BUILD_REPOSITORY_PATH)
+	ln -fs $(subst $(SPACE),/,$(patsubst %,..,$(subst /, ,$(dir $(BUILD_REPOSITORY_PATH))))) $(BUILD_REPOSITORY_PATH)
 
 $(BUILD_DIR)/bin/%: $(SOURCE) $(LIBRARIES_DIRS)
 	go build -v -o $@ $(REPOSITORY)/$(@:$(BUILD_DIR)/%=%)
