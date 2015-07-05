@@ -151,7 +151,7 @@ var outputFlags = []OutputFlag{
 				return nil, FlagParseErrorf("invalid syslog facility: %s", facilityName)
 			}
 
-			o, err := output.NewSyslogOutput(facility, tag)
+			o, err := output.NewSyslogOutput("", "", facility, tag)
 			if err != nil {
 				return nil, fmt.Errorf("Failed to set up syslog output: %s", err)
 			}
