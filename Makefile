@@ -6,6 +6,7 @@
 # and AMD64 on Linux as well as AMD64 on Darwin.
 REPOSITORY := github.com/nickbruun/coyote
 PACKAGES := \
+	errorhandlers \
 	output \
 	utils
 BINARIES := coyoterun
