@@ -55,15 +55,11 @@ func usage() {
 
 Output options:
 
--stdout
-    Add a stdout output.
--token-based-tcp=tcp[s]://<host>:<port>/<token>
-    Add a token-based TCP output, which sends token-prefixed lines over
-    an optionally SSL-encrypted TCP connection. For example, to use secure
-    Logentries token-based TCP output:
-
-        tcps://api.logentries.com:20000/2bfbea1e-10c3-4419-bdad-7e6435882e1f
 `, filepath.Base(os.Args[0]))
+
+	for _, f := range outputFlags {
+		fmt.Fprintf(os.Stderr, "%s\n", f.Usage)
+	}
 }
 
 func usageError(desc string) {
