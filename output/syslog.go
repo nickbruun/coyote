@@ -48,7 +48,7 @@ func NewSyslogOutput(network, raddr string, priority syslog.Priority, tag string
 
 		// Send data.
 		first := true
-		
+
 		for _, l := range lines {
 			if len(l) == 0 {
 				continue

@@ -2,19 +2,17 @@ package errorhandlers
 
 import (
 	"bytes"
-	"net/http"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 )
-
-// Test if a 
 
 // Opbeat error handler.
 type opbeatErrorHandler struct {
-	appId string
+	appId          string
 	organizationId string
-	secretToken string
+	secretToken    string
 }
 
 func (h *opbeatErrorHandler) Handle(errMsg *Error) error {
@@ -28,9 +26,9 @@ func (h *opbeatErrorHandler) Handle(errMsg *Error) error {
 	}
 
 	payload := map[string]interface{}{
-		"message": errMsg.Desc,
-		"culprit": errMsg.QuotedCmd(),
-		"extra": extra,
+		"message":   errMsg.Desc,
+		"culprit":   errMsg.QuotedCmd(),
+		"extra":     extra,
 		"timestamp": errMsg.Timestamp,
 	}
 
@@ -45,7 +43,6 @@ func (h *opbeatErrorHandler) Handle(errMsg *Error) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(data))
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://intake.opbeat.com/api/v1/organizations/%s/apps/%s/errors/", h.organizationId, h.appId), bytes.NewReader(data))
 	if err != nil {
@@ -95,8 +92,8 @@ func NewOpbeatErrorHandler(appId, organizationId, secretToken string) (Handler, 
 	}
 
 	return &opbeatErrorHandler{
-		appId: appId,
+		appId:          appId,
 		organizationId: organizationId,
-		secretToken: secretToken,
+		secretToken:    secretToken,
 	}, nil
 }

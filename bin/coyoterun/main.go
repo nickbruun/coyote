@@ -3,18 +3,19 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/nickbruun/coyote"
+	"github.com/nickbruun/coyote/errorhandlers"
 	"github.com/nickbruun/coyote/output"
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
-
-// Outputs.
-var outputs []output.Output
 
 // Sink a line.
 func sinkLine(l []byte, outputs []output.Output) {
@@ -50,6 +51,43 @@ func drainOutput(r io.Reader, outputs []output.Output, wg *sync.WaitGroup) {
 	wg.Done()
 }
 
+// Emit error.
+func emitError(cmd []string, err error, errorHandlers []errorhandlers.Handler) {
+	// Construct the error.
+	timestamp := time.Now().UTC()
+	hostname, _ := os.Hostname()
+
+	environ := make(map[string]string, len(os.Environ()))
+	for _, env := range os.Environ() {
+		var k, v string
+
+		equalPos := strings.IndexByte(env, '=')
+		if equalPos == -1 {
+			k = env
+		} else {
+			k = env[:equalPos]
+			v = env[equalPos+1:]
+		}
+
+		environ[k] = v
+	}
+
+	errMsg := &errorhandlers.Error{
+		Cmd:       cmd,
+		Desc:      err.Error(),
+		Hostname:  hostname,
+		Environ:   environ,
+		Timestamp: timestamp,
+	}
+
+	// Emit the error.
+	for _, h := range errorHandlers {
+		if err := h.Handle(errMsg); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to send error message: %s\n", err)
+		}
+	}
+}
+
 func usage() {
 	fmt.Fprintf(os.Stderr, `Usage: %s [OPTIONS] <command> [ARGS]
 
@@ -69,6 +107,10 @@ func usageError(desc string) {
 }
 
 func main() {
+	var outputs []output.Output
+	var errorHandlers []errorhandlers.Handler
+
+	// Parse argument flags.
 	var i int
 	var arg string
 	for i, arg = range os.Args[1:] {
@@ -122,6 +164,10 @@ func main() {
 			usage()
 			os.Exit(1)
 
+		case "v", "version":
+			fmt.Fprintf(os.Stderr, "coyoterun version %s\n", coyote.VERSION)
+			os.Exit(0)
+
 		default:
 			usageError(fmt.Sprintf("Error: unknown flag: %s", arg))
 		}
@@ -167,8 +213,22 @@ func main() {
 
 	if err := cmd.Start(); err != nil {
 		sinkLine([]byte(fmt.Sprintf("Unable to start process: %s", err)), outputs)
+		emitError(cmdArgs, fmt.Errorf("unable to start process: %s", err), errorHandlers)
 		exitStatus = 1
 	} else {
+		// Set up signal handler.
+		var lastSig os.Signal
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGABRT, syscall.SIGALRM, syscall.SIGFPE, syscall.SIGHUP, syscall.SIGILL, syscall.SIGINT, syscall.SIGPIPE, syscall.SIGQUIT, syscall.SIGSEGV, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2)
+
+		go func() {
+			for sig := range sigs {
+				cmd.Process.Signal(sig)
+				lastSig = sig
+			}
+		}()
+
+		// Drain output.
 		go drainOutput(stdout, outputs, &drainWg)
 		go drainOutput(stderr, outputs, &drainWg)
 
@@ -178,19 +238,26 @@ func main() {
 		// Close the process output readers and wait for draining to finish.
 		drainWg.Wait()
 
-		// If the process exited abnormally, write that as a log line to stderr
-		// output.
-		if waitErr != nil {
-			sinkLine([]byte(fmt.Sprintf("Process exited abnormally: %s", waitErr)), outputs)
-		}
-
 		// Exit with the status of the process.
+		exitUnexpected := true
+
 		if exitErr, ok := waitErr.(*exec.ExitError); ok {
 			if waitStatus, ok := exitErr.Sys().(syscall.WaitStatus); ok {
 				exitStatus = waitStatus.ExitStatus()
+
+				if lastSig != nil && waitStatus.Signal() == lastSig {
+					exitUnexpected = false
+				}
 			} else {
 				exitStatus = 1
 			}
+		}
+
+		// If the process exited abnormally, write that as a log line to stderr
+		// output and emit an error.
+		if waitErr != nil && exitUnexpected {
+			sinkLine([]byte(fmt.Sprintf("Process exited abnormally: %s", waitErr)), outputs)
+			emitError(cmdArgs, waitErr, errorHandlers)
 		}
 	}
 
