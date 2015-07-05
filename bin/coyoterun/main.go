@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"github.com/nickbruun/coyote/output"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 )
+
+// Outputs.
+var outputs []output.Output
 
 // Sink a line.
 func sinkLine(l []byte, outputs []output.Output) {
@@ -72,8 +73,6 @@ func usageError(desc string) {
 }
 
 func main() {
-	outputs := make([]output.Output, 0)
-
 	var i int
 	var arg string
 	for i, arg = range os.Args[1:] {
@@ -97,54 +96,35 @@ func main() {
 			value = arg[equalPos+1:]
 		}
 
+		// Attempt to handle the argument with an output flag parser.
+		handled := false
+		for _, f := range outputFlags {
+			if flag == f.Name {
+				handled = true
+
+				o, err := f.Parse(value)
+				if err != nil {
+					if flagErr, ok := err.(*FlagParseError); ok {
+						usageError(flagErr.Error())
+					} else {
+						fmt.Fprintf(os.Stderr, "%s\n", err)
+						os.Exit(1)
+					}
+				} else {
+					outputs = append(outputs, o)
+				}
+			}
+		}
+
+		if handled {
+			continue
+		}
+
+		// Fall back to default flag parsing.
 		switch flag {
 		case "h", "help", "?":
 			usage()
 			os.Exit(1)
-
-		case "stdout":
-			if value != "" {
-				usageError(fmt.Sprintf("Error: invalid value passed to -stdout: %s", value))
-			}
-
-			stdoutOutput, err := output.NewStdoutOutput()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to create stdout output: %s\n", err)
-				os.Exit(1)
-			}
-			outputs = append(outputs, stdoutOutput)
-
-		case "token-based-tcp":
-			if value == "" {
-				usageError("Error: no URL provided for token-based TCP output.")
-			}
-
-			url, err := url.Parse(value)
-			if err != nil {
-				usageError(fmt.Sprintf("Error: invalid URL provided for token-based TCP output: %s", err))
-			}
-
-			var ssl bool
-
-			if url.Scheme == "tcp" {
-				ssl = false
-			} else if url.Scheme == "tcps" {
-				ssl = true
-			} else {
-				usageError(fmt.Sprintf("Error: invalid URL scheme for token-based TCP output: %s", url.Scheme))
-			}
-
-			token := url.Path[1:]
-			if token == "" {
-				usageError(fmt.Sprintf("Error: no token specified for token-based TCP output."))
-			}
-
-			tcpTokenOutput, err := output.NewTokenBasedTcpOutput(url.Host, token, 5*time.Second, ssl)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to create token-based TCP output: %s\n", err)
-				os.Exit(1)
-			}
-			outputs = append(outputs, tcpTokenOutput)
 
 		default:
 			usageError(fmt.Sprintf("Error: unknown flag: %s", arg))
