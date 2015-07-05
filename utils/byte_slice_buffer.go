@@ -4,7 +4,7 @@ package utils
 //
 // Ring buffer with a maximum size.
 type ByteSliceBuffer struct {
-	size int
+	size   int
 	slices [][]byte
 	offset int
 }

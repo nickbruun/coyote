@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func TestByteSliceBuffer(t *testing.T) {
@@ -30,7 +30,7 @@ func TestByteSliceBuffer(t *testing.T) {
 		}
 
 		expected := make([][]byte, 0, i+1)
-		for j := i-9; j <= i; j++ {
+		for j := i - 9; j <= i; j++ {
 			expected = append(expected, []byte{byte(j)})
 		}
 

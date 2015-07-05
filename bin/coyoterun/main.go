@@ -139,7 +139,7 @@ func main() {
 				usageError(fmt.Sprintf("Error: no token specified for token-based TCP output."))
 			}
 
-			tcpTokenOutput, err := output.NewTokenBasedTcpOutput(url.Host, token, 5 * time.Second, ssl)
+			tcpTokenOutput, err := output.NewTokenBasedTcpOutput(url.Host, token, 5*time.Second, ssl)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to create token-based TCP output: %s\n", err)
 				os.Exit(1)

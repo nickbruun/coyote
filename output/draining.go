@@ -16,7 +16,7 @@ type drainingOutputClose func()
 // sinking fails, it will be retried.
 type drainingOutput struct {
 	lineCh chan []byte
-	done chan struct{}
+	done   chan struct{}
 }
 
 func (o *drainingOutput) Sink(line []byte) {
@@ -105,6 +105,6 @@ func newDrainingOutput(bufferSize int, oSink drainingOutputSink, oClose draining
 
 	return &drainingOutput{
 		lineCh: lineCh,
-		done: done,
+		done:   done,
 	}, nil
 }
